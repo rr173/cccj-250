@@ -105,7 +105,10 @@ result = paginate(payload)          # -> dict, status ∈ ok / infeasible / inva
 
 ```bash
 python3 -m ledger_pagination examples/sample_input.json   # 或从 stdin 读
+python3 -m ledger_pagination paginate examples/sample_input.json   # 显式子命令
 ```
+
+原有入口与页格式不变；不写子命令时仍按分页处理。
 
 ## 测试
 
@@ -117,3 +120,146 @@ python3 tests/run_tests.py          # 无 pytest 依赖；文件同时兼容 pyt
   续行、引注共用、固定决胜（同页数字典序最小）逐一核对；
 - 长清单（20 万 / 100 万明细，单页可容纳数千行）：核对线性探测计数与耗时，
   验证没有逐一生成每个合法整页区间后再选页。
+
+- `trace-sources`：与 `tests/sources_ref.py` 的显式列表参考实现随机对照 1500 例；
+  批量调拨（2 万收货批次 × 200 次整批换仓）核对没有逐批遍历/复制。
+
+---
+
+# 领退料来源明细（`trace-sources`）
+
+从仓库单据版本重建一份可供关账核对的**领退料来源明细**：每张领用单/退料单
+各一行，列出数量来自哪些**收货批次**。分页代码与页格式完全不受影响。
+
+```bash
+python3 -m ledger_pagination trace-sources examples/sample_sources_input.json
+```
+
+## 输入
+
+```json
+{
+  "business_cutoff": 100,
+  "entry_cutoff": 100,
+  "versions": [
+    {"doc_id": "R1", "entry_time": 10, "type": "receipt", "business_time": 10,
+     "material_id": "M", "warehouse_id": "W1", "quantity": 5},
+    {"doc_id": "T1", "entry_time": 30, "type": "transfer", "business_time": 30,
+     "material_id": "M", "warehouse_id": "W1", "to_warehouse_id": "W2", "quantity": 6},
+    {"doc_id": "X1", "entry_time": 70, "type": "return", "business_time": 50,
+     "material_id": "M", "warehouse_id": "W2", "quantity": 3, "issue_doc_id": "I1"},
+    {"doc_id": "R3", "entry_time": 95, "void": true}
+  ]
+}
+```
+
+| 字段 | 含义 | 约束 |
+|---|---|---|
+| `business_cutoff` | 业务截止时点 | 整数，**包含**该时点 |
+| `entry_cutoff` | 录入截止时点 | 整数，**包含**该时点 |
+| `versions` | 单据版本列表 | 可乱序 |
+
+普通版本：`doc_id`（非空字符串，稳定单据 ID）、`entry_time`（整数录入时点）、
+`type`（`receipt` / `transfer` / `issue` / `return`）、`business_time`（整数业务时点）、
+`material_id`、`warehouse_id`（非空字符串）、`quantity`（**正整数**）。
+`transfer` 另需 `to_warehouse_id`（且必须不同于 `warehouse_id`）；`return` 另需
+`issue_doc_id`。撤销版本只需 `doc_id`、`entry_time` 与标记：`"void": true`
+（也接受 `cancelled` / `canceled` / `revoked` 布尔标记；或 `"type": "void"`）。
+
+### 版本选择
+
+1. 同一单据同一 `entry_time`：内容相同只算一次；内容不同即 `version_conflict`。
+2. 只看 `entry_time <= entry_cutoff` 的版本，取 `entry_time` 最大的那个为准（最新版）。
+3. 若最新版是撤销版本，该单据整个不参与。
+4. 选定版本若 `business_time > business_cutoff` 也不参与——**即使该单据更旧的版本
+   在业务截止之前**。
+5. 因此迟录的更正只影响录入截止在其之后的查询，不影响更早录入截止的结果。
+
+`entry_time > entry_cutoff` 的版本根本不可见，不做字段校验。
+
+### 参与与顺序
+
+参与单据按 `(business_time, doc_id)` 升序处理，`doc_id` 按字符码点比较。
+库存从零开始；材料必须在本输入中有**参与的**收货单作为依据，否则报错。
+
+## 规则
+
+- 收货单本身就是来源批次，进入本仓可用库存。
+- 调拨从发出仓按到达顺序依次扣足，扣出的各批按原次序进入目的仓；**调拨号不是来源批次**。
+- 领用按到达顺序 FIFO 扣货，并保留扣货顺序。
+- 退料必须引用仍然有效、排在它之前、同仓同物料的领用单；从该领用单尚未退回的
+  扣货序列**末尾**取数量（同一领用单可分多次退）。退回的批次保留原扣货序列中的
+  相对顺序，接到当前仓可用库存的**末尾**：不挑当前货架上的批次，也不插回原收货位置。
+- 输出行的来源按收货单 ID 排序、同一收货单合并；领用为正、退料为负，来源数量之和
+  等于该行 `quantity`。退料另列 `issue_doc_id`，**不回改**原领用行；旧单据的来源
+  明细永不因后续领用而改变。
+
+## 结果
+
+成功（`status: "ok"`）：
+
+```json
+{
+  "status": "ok",
+  "business_cutoff": 100,
+  "entry_cutoff": 100,
+  "details": [
+    {
+      "doc_id": "I1", "business_time": 40, "entry_time": 80, "type": "issue",
+      "warehouse_id": "W2", "material_id": "M", "quantity": 5,
+      "sources": [{"receipt_doc_id": "R1", "quantity": 5}]
+    },
+    {
+      "doc_id": "X1", "business_time": 50, "entry_time": 70, "type": "return",
+      "warehouse_id": "W2", "material_id": "M", "quantity": -3,
+      "issue_doc_id": "I1",
+      "sources": [{"receipt_doc_id": "R1", "quantity": -3}]
+    }
+  ],
+  "stats": {"documents": 8, "receipts": 2, "transfers": 1, "issues": 3,
+            "returns": 2, "nodes_created": 10, "split_calls": 6,
+            "merge_calls": 3, "leaf_visits": 4}
+}
+```
+
+`details` 只含参与的领用/退料单，按 `(business_time, doc_id)` 排序；没有则为 `[]`。
+完整可复跑样例：`examples/sample_sources_input.json` →
+`examples/sample_sources_expected.json`。
+
+失败（退出码 1，**不输出任何部分明细**）：
+
+- `status: "invalid"` + `errors: [...]`：字段非法（`input_index` 定位输入位置；
+  能读出身份时附 `doc_id`/`entry_time`；身份本身读不出时给 `input_index`）、
+  `version_conflict`。
+- `status: "error"` + `error: {...}`：重放失败。`error` 含 `code`、`message`、
+  `doc_id`、`business_time`、`entry_time`、`input_index`，按需附
+  `warehouse_id`/`material_id`/`requested`/`available`/`referenced_doc_id`/`reason`。
+  代码：`insufficient_stock`（出库不足）、`no_receipt_evidence`、
+  `invalid_return_reference`、`over_return`（累计超退）。
+
+## 算法与复杂度
+
+每个 `(仓库, 物料)` 的可用库存是一条**到达序 FIFO 队列**，用隐式 treap 存
+"批次贡献块"，每块挂节点数量、子树数量合计：
+
+- 领用/调拨按数量切分 treap（`split` 按子树数量定位），**不逐件展开**；
+  一次切分只在边界批次处拆出一个新块，长度与批次数量无关。
+- 整批换仓时目的仓为空则直接链接根节点，`O(1)`；否则 `merge` 为 `O(log 批次数)`，
+  **不遍历、不复制整份批次清单**——这正是"混有许多收货批次连续整批换仓、末端才领用"的场景。
+- 退料按数量从领用单扣货序列末尾取（同样是按数量取尾），再以 `O(尾块数)` 重建
+  一个小 treap 接到库存末尾。
+- 只有实际产生来源明细的领用/退料行才遍历其批次；`stats.leaf_visits` 可核对这一点。
+
+总代价 `O((单据数 + 批次块数) log 批次数)`。
+
+## 生成式验证（不提交大数据）
+
+```bash
+python3 examples/verify_sources.py --bulk          # 批量调拨开销
+python3 examples/verify_sources.py --random 2000   # 随机对照 tests/sources_ref.py
+```
+
+`--bulk` 生成"多批次 + 整批连续换仓 + 末端领用"，打印耗时与
+`leaf_visits`/`split_calls`：跳数从 0 增到 400，`leaf_visits` 恒等于批次数，
+证明每多一道调拨不会遍历或复制批次清单。随机样例由内置生成器现场产生，
+仓库中只保留生成脚本，不提交大数据文件。

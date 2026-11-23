@@ -1,0 +1,99 @@
+{
+  "status": "ok",
+  "business_cutoff": 100,
+  "entry_cutoff": 100,
+  "details": [
+    {
+      "doc_id": "I1",
+      "business_time": 40,
+      "entry_time": 80,
+      "type": "issue",
+      "warehouse_id": "W2",
+      "material_id": "M",
+      "quantity": 5,
+      "sources": [
+        {
+          "receipt_doc_id": "R1",
+          "quantity": 5
+        }
+      ]
+    },
+    {
+      "doc_id": "X1",
+      "business_time": 50,
+      "entry_time": 70,
+      "type": "return",
+      "warehouse_id": "W2",
+      "material_id": "M",
+      "quantity": -3,
+      "issue_doc_id": "I1",
+      "sources": [
+        {
+          "receipt_doc_id": "R1",
+          "quantity": -3
+        }
+      ]
+    },
+    {
+      "doc_id": "I2",
+      "business_time": 60,
+      "entry_time": 60,
+      "type": "issue",
+      "warehouse_id": "W2",
+      "material_id": "M",
+      "quantity": 3,
+      "sources": [
+        {
+          "receipt_doc_id": "R1",
+          "quantity": 2
+        },
+        {
+          "receipt_doc_id": "R2",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "doc_id": "I3",
+      "business_time": 65,
+      "entry_time": 65,
+      "type": "issue",
+      "warehouse_id": "W1",
+      "material_id": "M",
+      "quantity": 5,
+      "sources": [
+        {
+          "receipt_doc_id": "R2",
+          "quantity": 5
+        }
+      ]
+    },
+    {
+      "doc_id": "X2",
+      "business_time": 80,
+      "entry_time": 80,
+      "type": "return",
+      "warehouse_id": "W1",
+      "material_id": "M",
+      "quantity": -2,
+      "issue_doc_id": "I3",
+      "sources": [
+        {
+          "receipt_doc_id": "R2",
+          "quantity": -2
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "documents": 8,
+    "receipts": 2,
+    "transfers": 1,
+    "issues": 3,
+    "returns": 2,
+    "nodes_created": 10,
+    "split_calls": 6,
+    "merge_calls": 3,
+    "leaf_visits": 4
+  }
+}

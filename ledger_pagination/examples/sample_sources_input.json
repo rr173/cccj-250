@@ -1,0 +1,29 @@
+{
+  "business_cutoff": 100,
+  "entry_cutoff": 100,
+  "versions": [
+    {"doc_id": "I2", "entry_time": 60, "type": "issue", "business_time": 60,
+     "material_id": "M", "warehouse_id": "W2", "quantity": 3},
+    {"doc_id": "R1", "entry_time": 10, "type": "receipt", "business_time": 10,
+     "material_id": "M", "warehouse_id": "W1", "quantity": 5},
+    {"doc_id": "T1", "entry_time": 30, "type": "transfer", "business_time": 30,
+     "material_id": "M", "warehouse_id": "W1", "to_warehouse_id": "W2", "quantity": 6},
+    {"doc_id": "X1", "entry_time": 70, "type": "return", "business_time": 50,
+     "material_id": "M", "warehouse_id": "W2", "quantity": 3, "issue_doc_id": "I1"},
+    {"doc_id": "I1", "entry_time": 40, "type": "issue", "business_time": 40,
+     "material_id": "M", "warehouse_id": "W2", "quantity": 4},
+    {"doc_id": "R2", "entry_time": 20, "type": "receipt", "business_time": 20,
+     "material_id": "M", "warehouse_id": "W1", "quantity": 7},
+    {"doc_id": "I1", "entry_time": 80, "type": "issue", "business_time": 40,
+     "material_id": "M", "warehouse_id": "W2", "quantity": 5},
+    {"doc_id": "I3", "entry_time": 65, "type": "issue", "business_time": 65,
+     "material_id": "M", "warehouse_id": "W1", "quantity": 5},
+    {"doc_id": "X2", "entry_time": 80, "type": "return", "business_time": 80,
+     "material_id": "M", "warehouse_id": "W1", "quantity": 2, "issue_doc_id": "I3"},
+    {"doc_id": "I5", "entry_time": 200, "type": "issue", "business_time": 70,
+     "material_id": "M", "warehouse_id": "W1", "quantity": 1},
+    {"doc_id": "R3", "entry_time": 90, "type": "receipt", "business_time": 90,
+     "material_id": "M", "warehouse_id": "W1", "quantity": 100},
+    {"doc_id": "R3", "entry_time": 95, "void": true}
+  ]
+}
