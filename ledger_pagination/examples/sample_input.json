@@ -1,0 +1,15 @@
+{
+  "capacity": 12,
+  "citation_catalog": {"Q1": 1, "Q2": 2},
+  "unbreakable_groups": ["B"],
+  "details": [
+    {"group": "A", "qty": "10", "units": 1, "citations": ["Q1"]},
+    {"group": "A", "qty": "-2", "units": 1, "citations": []},
+    {"group": "A", "qty": "3.5", "units": 2, "citations": ["Q2"]},
+    {"group": "A", "qty": "4", "units": 1, "citations": ["Q1"]},
+    {"group": "B", "qty": "7", "units": 1, "citations": ["Q2"]},
+    {"group": "B", "qty": "-1", "units": 1, "citations": []},
+    {"group": "C", "qty": "2", "units": 1, "citations": []},
+    {"group": "C", "qty": "6", "units": 3, "citations": ["Q1", "Q2"]}
+  ]
+}
