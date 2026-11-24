@@ -417,3 +417,144 @@ python3 examples/verify_reconcile.py --random 1500 --scale
 `--random` 与 `tests/reconcile_ref.py` 的穷举参考实现随机对照（参考实现逐套时刻枚举、
 逐物料取笛卡尔积）；`--scale` 用 10^15 宽的时间窗口、2000 次换站的长路线核对：
 不按刻扫描、不枚举时刻组合，耗时与窗口宽度无关。
+
+---
+
+# 交接装箱清单（`handoff-manifests`）
+
+发货台把装箱、拆封和交接的扫描记录整理成收货方可逐件点收的清单。外箱里还能套周转箱；
+只扫了外箱换到另一托盘，不代表里面的每件货都重新扫过。本命令按实际交接时的装载关系和
+封签生成 JSON 清单。分页、`trace-sources`、`reconcile-counts` 的入口与格式完全不变。
+
+```bash
+python3 -m ledger_pagination handoff-manifests examples/sample_manifests_input.json
+python3 -m ledger_pagination handoff-manifests < examples/sample_manifests_input.json
+```
+
+## 输入
+
+```json
+{
+  "objects": [
+    {"id": "T1", "kind": "container"},
+    {"id": "I1", "kind": "item", "material_id": "M-01"}
+  ],
+  "events": [
+    {"seq": 2, "type": "move", "changes": [{"id": "I1", "parent_id": "T1"}]},
+    {"seq": 5, "type": "seal", "id": "T1", "seal_id": "S-100"},
+    {"seq": 9, "type": "handoff", "id": "T1"}
+  ]
+}
+```
+
+| 字段 | 含义 | 约束 |
+|---|---|---|
+| `objects[].id` | 对象 ID | 非空字符串，目录内唯一 |
+| `objects[].kind` | 对象种类 | `"container"` 或 `"item"` |
+| `objects[].material_id` | 货件物料 | 非空字符串；`kind` 为 `item` 时必填 |
+| `events[].seq` | 扫描序号 | 非负整数，全表唯一；**以 `seq` 值为准**，数组位置不代表先后 |
+| `events[].type` | 记录类型 | `move` / `seal` / `open` / `handoff` |
+
+每个货件 ID 对应一件实物；容器可装货件或其他容器，货件不能再装东西。起初所有对象都在
+现场、没有上级容器，也没有封签。
+
+### `move`：一组同时生效的改挂
+
+`changes` 为非空数组，每项 `{id, parent_id}`；`parent_id: null` 表示落地独立放置。
+组内每个对象最多改挂一次，且确实要换上级。整组表示**同一次搬运**：只承认整组之前和之后
+的装载关系，最终不能出现循环——例如 B 原装在 A 里，同一条记录让 B 落地、A 装进 B，只要
+没有触碰封签，就不应因 `changes` 的排列方式被判成循环。
+
+- 移出的旧容器或其任何上级在搬运**前**若已封签，就不能从那里取物（`sealed_source`）；
+- 装入的新容器或其任何上级在搬运**后**若已封签，就不能往那里装物（`sealed_destination`）；
+- 已封签的箱子本身可以作为整体搬动，不得因此改变箱内关系。
+
+### `seal` / `open`：加封与拆封
+
+带容器 `id` 及 `seal_id`。加封时该容器须未加封；开封必须与当前封签相符，开封后不再有
+活动封签。如果容器在另一只已封签容器内，两种操作都做不了（`sealed_ancestor`）。
+
+### `handoff`：交接离场
+
+带容器 `id`。只有独立放置且仍带活动封签的容器能交接。交接后，箱及当时里面所有对象均已
+离场，后面的扫描不得再操作它们，包括作为改挂目的地（`departed_object`）。
+
+## 输出
+
+成功（`status: "ok"`）：
+
+```json
+{
+  "status": "ok",
+  "manifests": [
+    {
+      "seq": 9,
+      "id": "T1",
+      "objects": [
+        {"id": "I1", "kind": "item", "parent_id": "T1", "material_id": "M-01"},
+        {"id": "T1", "kind": "container", "parent_id": null, "seal_id": "S-100"}
+      ]
+    }
+  ],
+  "stats": {"objects": 2, "events": 3, "moves": 1, "seals": 1, "opens": 0,
+            "handoffs": 1, "change_details": 1, "manifest_objects": 2,
+            "accesses": 5, "links": 1, "cuts": 0, "root_queries": 1,
+            "splays": 11, "splay_rotations": 0}
+}
+```
+
+| 字段 | 含义 |
+|---|---|
+| `manifests[]` | 每份交接清单；按交接 `seq` 递增；没有交接时为 `[]` |
+| `manifests[].seq` / `id` | 交接记录的 `seq` 与交接容器 ID |
+| `manifests[].objects[]` | 交接容器连同当时全部后代；按 `id` 字符码点升序 |
+| `objects[].parent_id` | 交接当时的上级容器；交接根为 `null` |
+| `objects[].material_id` | 货件的物料 ID |
+| `objects[].seal_id` | 容器当时的活动封签；开着的容器为 `null` |
+
+完整可复跑样例：`examples/sample_manifests_input.json` →
+`examples/sample_manifests_expected.json`（样例里事件数组故意不按 `seq` 排列，
+并含"B 出 A、A 进 B"的同组互换与已封签整箱搬动）。
+
+## 失败
+
+失败时退出码为 1，**不输出任何部分清单**：
+
+- `status: "invalid"` + `errors: [...]`：目录或记录结构非法（字段类型不对、`kind`
+  未知、货件缺 `material_id`、对象 ID 重复、`seq` 缺失/非法/重复、`changes` 为空、
+  `parent_id` 键缺失等）。每条带 `input_index`；`seq` 读得出时一并给出，重复 ID/seq
+  给出全部 `input_indices`。
+- `status: "error"` + `error: {...}`：记录结构合法但违反搬运规则。`error` 含 `code`、
+  `message`、`seq`、`input_index`，并按需附 `object_id` / `parent_id` /
+  `container_id` / `sealed_container_id` / `seal_id` / `current_seal_id`。代码：
+  `unknown_object`、`departed_object`、`not_a_container`、`item_as_parent`、
+  `duplicate_change`、`no_change`、`sealed_source`、`sealed_destination`、`cycle`、
+  `already_sealed`、`not_sealed`、`seal_mismatch`、`sealed_ancestor`、`not_standalone`。
+
+## 算法与复杂度
+
+装载关系用**无翻转 link-cut 树**维护（只把整棵子树的根挂到新父节点下，无需 lazy 翻转），
+在每条优选路径上聚合"已封签容器数"：
+
+- 一次整箱改挂 = 一次 `cut` + 一次 `link`，箱内成千上万件货**不展开、不复制**；
+- "上级链上是否有封签"是一次路径聚合查询（`access` 后读根聚合值），**不回查整条祖先链**，
+  与嵌套深度无关；
+- 同组多条改挂：先按改挂前状态逐条查源链封签，再全部 `cut`、逐条 `link`（挂接目标已在
+  被搬子树内即成环），最后按改挂后状态逐条查目标链封签；任一步失败即整体回滚该组；
+- 交接时枚举该箱当时全部后代并标记离场——只有**实际列进清单的对象**才有这次枚举。
+
+每条改挂明细与每次封签操作的摊还成本为 `O(log n)`（优于要求的对数平方），
+`stats.splay_rotations` 可核对：深度从 2 千增到 3.2 万时，每条明细的旋转数恒约 2.1。
+整个输入按 `seq` 排序不计入该项。
+
+## 测试与生成式验证
+
+```bash
+python3 tests/run_tests.py test_manifests       # 单元、样例与随机对照测试
+python3 examples/verify_manifests.py --random 2000
+python3 examples/verify_manifests.py --scale
+```
+
+`--random` 与 `tests/manifests_ref.py` 的显式参考实现（父指针数组 + 逐链回查）随机对照，
+合法会话逐清单全等、非法会话错误码一致；`--scale` 生成"深嵌套 + 单箱两万货件 +
+连续整箱改挂"的场景，核对每条改挂明细的摊还成本不随嵌套深度增长。

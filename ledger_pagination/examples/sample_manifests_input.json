@@ -1,0 +1,35 @@
+{
+  "objects": [
+    {"id": "T1", "kind": "container"},
+    {"id": "T2", "kind": "container"},
+    {"id": "A", "kind": "container"},
+    {"id": "B", "kind": "container"},
+    {"id": "C", "kind": "container"},
+    {"id": "I1", "kind": "item", "material_id": "M-01"},
+    {"id": "I2", "kind": "item", "material_id": "M-01"},
+    {"id": "I3", "kind": "item", "material_id": "M-02"},
+    {"id": "I4", "kind": "item", "material_id": "M-02"},
+    {"id": "I5", "kind": "item", "material_id": "M-03"}
+  ],
+  "events": [
+    {"seq": 13, "type": "seal", "id": "T1", "seal_id": "S-100"},
+    {"seq": 2, "type": "move", "changes": [
+      {"id": "I1", "parent_id": "A"},
+      {"id": "I2", "parent_id": "A"},
+      {"id": "I3", "parent_id": "B"},
+      {"id": "I4", "parent_id": "B"},
+      {"id": "I5", "parent_id": "C"}
+    ]},
+    {"seq": 19, "type": "handoff", "id": "T1"},
+    {"seq": 9, "type": "move", "changes": [
+      {"id": "B", "parent_id": null},
+      {"id": "A", "parent_id": "B"}
+    ]},
+    {"seq": 21, "type": "handoff", "id": "C"},
+    {"seq": 5, "type": "move", "changes": [{"id": "B", "parent_id": "A"}]},
+    {"seq": 15, "type": "move", "changes": [{"id": "T1", "parent_id": "T2"}]},
+    {"seq": 7, "type": "seal", "id": "C", "seal_id": "S-200"},
+    {"seq": 17, "type": "move", "changes": [{"id": "T1", "parent_id": null}]},
+    {"seq": 11, "type": "move", "changes": [{"id": "B", "parent_id": "T1"}]}
+  ]
+}

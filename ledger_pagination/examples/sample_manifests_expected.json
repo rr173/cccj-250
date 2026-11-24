@@ -1,0 +1,87 @@
+{
+  "status": "ok",
+  "manifests": [
+    {
+      "seq": 19,
+      "id": "T1",
+      "objects": [
+        {
+          "id": "A",
+          "kind": "container",
+          "parent_id": "B",
+          "seal_id": null
+        },
+        {
+          "id": "B",
+          "kind": "container",
+          "parent_id": "T1",
+          "seal_id": null
+        },
+        {
+          "id": "I1",
+          "kind": "item",
+          "parent_id": "A",
+          "material_id": "M-01"
+        },
+        {
+          "id": "I2",
+          "kind": "item",
+          "parent_id": "A",
+          "material_id": "M-01"
+        },
+        {
+          "id": "I3",
+          "kind": "item",
+          "parent_id": "B",
+          "material_id": "M-02"
+        },
+        {
+          "id": "I4",
+          "kind": "item",
+          "parent_id": "B",
+          "material_id": "M-02"
+        },
+        {
+          "id": "T1",
+          "kind": "container",
+          "parent_id": null,
+          "seal_id": "S-100"
+        }
+      ]
+    },
+    {
+      "seq": 21,
+      "id": "C",
+      "objects": [
+        {
+          "id": "C",
+          "kind": "container",
+          "parent_id": null,
+          "seal_id": "S-200"
+        },
+        {
+          "id": "I5",
+          "kind": "item",
+          "parent_id": "C",
+          "material_id": "M-03"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "objects": 10,
+    "events": 10,
+    "moves": 6,
+    "seals": 2,
+    "opens": 0,
+    "handoffs": 2,
+    "change_details": 11,
+    "manifest_objects": 9,
+    "accesses": 35,
+    "links": 9,
+    "cuts": 2,
+    "root_queries": 9,
+    "splays": 81,
+    "splay_rotations": 2
+  }
+}

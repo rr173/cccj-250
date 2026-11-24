@@ -2,8 +2,10 @@
 
 Also exposes :func:`trace_sources`, which rebuilds per-issue/return receipt
 source details from warehouse document versions (``trace-sources`` command),
-and :func:`reconcile_counts`, which rolls physical counts to one closing instant
-(``reconcile-counts`` command).
+:func:`reconcile_counts`, which rolls physical counts to one closing instant
+(``reconcile-counts`` command), and :func:`handoff_manifests`, which builds
+per-handoff packing manifests from shipping-dock scan events
+(``handoff-manifests`` command).
 """
 
 from .core import (
@@ -16,6 +18,10 @@ from .core import (
     paginate,
 )
 from .brute import brute_paginate
+from .manifests import STATUS_ERROR as MANIFESTS_STATUS_ERROR
+from .manifests import STATUS_INVALID as MANIFESTS_STATUS_INVALID
+from .manifests import STATUS_OK as MANIFESTS_STATUS_OK
+from .manifests import handoff_manifests
 from .reconcile import STATUS_ERROR as RECONCILE_STATUS_ERROR
 from .reconcile import STATUS_INVALID as RECONCILE_STATUS_INVALID
 from .reconcile import STATUS_OK as RECONCILE_STATUS_OK
@@ -30,6 +36,7 @@ __all__ = [
     "brute_paginate",
     "trace_sources",
     "reconcile_counts",
+    "handoff_manifests",
     "HEADER_UNITS",
     "CONTROL_UNITS",
     "MARKER_UNITS",
@@ -42,4 +49,7 @@ __all__ = [
     "RECONCILE_STATUS_OK",
     "RECONCILE_STATUS_INVALID",
     "RECONCILE_STATUS_ERROR",
+    "MANIFESTS_STATUS_OK",
+    "MANIFESTS_STATUS_INVALID",
+    "MANIFESTS_STATUS_ERROR",
 ]
