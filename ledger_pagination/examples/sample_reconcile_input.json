@@ -1,0 +1,31 @@
+{
+  "close_time": 100,
+  "counts": [
+    {"warehouse_id": "W", "material_id": "M", "count_time": 120, "counted": 24, "book": 20},
+    {"warehouse_id": "E", "material_id": "M", "count_time": 80, "counted": 14, "book": 10},
+    {"warehouse_id": "S", "material_id": "K", "count_time": 20, "counted": 3, "book": 3}
+  ],
+  "journeys": [
+    {
+      "journey_id": "J1",
+      "material_id": "M",
+      "quantity": 4,
+      "route": ["E", "W"],
+      "windows": [[90, 110]]
+    },
+    {
+      "journey_id": "J2",
+      "material_id": "M",
+      "quantity": 6,
+      "route": ["W", null, "E"],
+      "windows": [[40, 50], [60, 70]]
+    },
+    {
+      "journey_id": "J3",
+      "material_id": "K",
+      "quantity": 5,
+      "route": ["N", "S", "N"],
+      "windows": [[10, 15], [28, 30]]
+    }
+  ]
+}

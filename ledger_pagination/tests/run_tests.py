@@ -15,7 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
-DEFAULT_MODULES = ("test_pagination", "test_sources")
+DEFAULT_MODULES = ("test_pagination", "test_sources", "test_reconcile")
 
 
 def main(argv):

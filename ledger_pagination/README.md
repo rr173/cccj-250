@@ -263,3 +263,157 @@ python3 examples/verify_sources.py --random 2000   # 随机对照 tests/sources_
 `leaf_visits`/`split_calls`：跳数从 0 增到 400，`leaf_visits` 恒等于批次数，
 证明每多一道调拨不会遍历或复制批次清单。随机样例由内置生成器现场产生，
 仓库中只保留生成脚本，不提交大数据文件。
+
+---
+
+# 盘点差异折算（`reconcile-counts`）
+
+财务拿到的是**同一关账时点**的账面余额，而实盘是各库在不同时刻分别盘出来的。
+两者之间货物还在两库间流转，所以不能拿各库当时的实盘数直接减账面数——要先把实盘数
+折算到关账时点，再作差。`reconcile-counts` 读取移动证据（`journeys`），给出
+逐仓逐物料、逐物料的盘点差异表。分页与 `trace-sources` 的输入、输出完全不变。
+
+```bash
+python3 -m ledger_pagination reconcile-counts examples/sample_reconcile_input.json
+python3 -m ledger_pagination reconcile-counts < examples/sample_reconcile_input.json
+```
+
+## 输入
+
+```json
+{
+  "close_time": 100,
+  "counts": [
+    {"warehouse_id": "E", "material_id": "M", "count_time": 80, "counted": 14, "book": 10}
+  ],
+  "journeys": [
+    {"journey_id": "J1", "material_id": "M", "quantity": 4,
+     "route": ["E", "W"], "windows": [[90, 110]]}
+  ]
+}
+```
+
+| 字段 | 含义 | 约束 |
+|---|---|---|
+| `close_time` | 关账时点 | 整数，全表共用 |
+| `counts[].warehouse_id` / `material_id` | 要核对的仓、物料 | 非空字符串；同一组合只能出现一次 |
+| `counts[].count_time` | 该库实盘时刻 | 整数（可早于或晚于 `close_time`） |
+| `counts[].counted` | 实盘数 | 非负整数 |
+| `counts[].book` | 同一关账时点的账面数 | 非负整数 |
+| `journeys[].journey_id` | 移动证据 ID | 非空字符串、唯一 |
+| `journeys[].material_id` | 物料 | 非空字符串 |
+| `journeys[].quantity` | 该批实物数量 | 正整数，一路不变 |
+| `journeys[].route` | 按发生顺序经过的站，至少两项 | 仓库 ID 或 `null`（在途/库外），相邻两项不同；允许回到经过的库 |
+| `journeys[].windows[i]` | 第 i 次换站的时刻窗口 | 含两端的整数区间 `[earliest, latest]`；项数恰为 `len(route)-1` |
+
+两个数组的记录不必按时间排序；输入顺序不影响结果。
+
+## 折算与差异
+
+一次换站有一个整数实际时刻；同一条记录的换站时刻**不得逆序**，可以同刻。
+同刻的换站按路线顺序全部完成后，才认定该刻的实物所在地。首次换站前在起点，
+最后一次以后在终点。不同记录的时刻各自独立取值。
+
+给定一套实际时刻，一条盘点行的关账实物数为
+
+```
+reconciled = counted + quantity × (关账时是否在该库 − 实盘时是否在该库)
+```
+
+实盘发生在关账之后时，同一公式向回折算。差异 `= reconciled − book`。
+折算数为负照实保留；实盘与移动证据对不上时，也不据此删掉任何符合路线与窗口的时刻。
+
+只有时间范围、没有确切时刻的换站**不替仓库猜**：报告给出所有可行时刻下能达到的
+最小值和最大值。若某行的最小值与最大值来自不同的时刻组合，这是正常的——它们各自都
+有可行的时刻可以取到。
+
+## 输出
+
+```json
+{
+  "status": "ok",
+  "close_time": 100,
+  "rows": [
+    {
+      "warehouse_id": "E", "material_id": "M",
+      "count_time": 80, "counted": 14, "book": 10,
+      "reconciled_min": 10, "reconciled_max": 14,
+      "difference_min": 0,  "difference_max": 4
+    }
+  ],
+  "material_totals": [
+    {
+      "material_id": "M",
+      "counted_total": 38, "book_total": 30,
+      "reconciled_min": 34, "reconciled_max": 34,
+      "difference_min": 4,  "difference_max": 4
+    }
+  ]
+}
+```
+
+| 字段 | 含义 |
+|---|---|
+| `rows[]` | 每个盘过的「仓库 × 物料」一行；按物料 ID、仓库 ID 的字符码点升序 |
+| `rows[].reconciled_min` / `_max` | 折算到关账时点的实物数的最小值 / 最大值 |
+| `rows[].difference_min` / `_max` | 折算实物数减 `book` 的最小值 / 最大值 |
+| `material_totals[]` | 每个**有盘点行**的物料一行；按物料 ID 字符码点升序 |
+| `material_totals[].counted_total` / `book_total` | 本次实盘各仓实盘数合计 / 账面数合计 |
+| `material_totals[].reconciled_min` / `_max` | **同一套移动时刻**下合计折算数的最小值 / 最大值 |
+| `material_totals[].difference_min` / `_max` | 合计折算数减 `book_total` 的最小值 / 最大值 |
+
+关键点：合计行按同一套移动时刻求边界，**不把各仓各自的上下界相加**。例如一批 4 件可能
+在关账前或关账后由东库转去西库，东库在它离开前盘了 14 件、西库在它到达后盘了 24 件：
+两库折算数分别为 10–14、20–24，但合计一定是 34。没有盘点行的仓库不会凭空生成一行。
+同一物料若有多批移动，各批时刻互相独立，但同一批在一次合计中只取一个时刻。
+
+完整可复跑样例：`examples/sample_reconcile_input.json` →
+`examples/sample_reconcile_expected.json`（上表即该样例 M 物料的实际结果）。
+
+## 失败
+
+非法输入（字段类型/范围不对、组合重复、`journey_id` 重复、路线或窗口结构不对）返回
+`status: "invalid"` 与 `errors`，每条带 `input_index`（能读出身份时附
+`warehouse_id`/`material_id`/`journey_id`）；重复组合/重复 ID 给出全部 `input_indices`。
+
+只要有**任一条整条路线**找不到一组符合先后关系与全部窗口的实际时刻（即使它不产生任何
+差异），命令返回 `status: "error"`、`error.code = "infeasible_route"`，并给出
+`journey_id`、`input_index`、`route`、`windows` 与受阻的换站序号。两种情况都不输出部分
+差异表，进程退出码为 1。
+
+## 算法与复杂度
+
+把窗口的左端取前缀最大得到 `E[i]`（第 i 次换站最早可能的时刻），右端取后缀最小得到
+`B[i]`（最晚可能时刻）。整条路线可行 ⇔ 每个 i 都有 `E[i] ≤ B[i]`；当刻已完成换站数的
+可达范围是区间
+
+```
+L(t) = #{ i : B[i] ≤ t },   P(t) = #{ i : E[i] ≤ t }
+```
+
+且任意满足 `L(t) ≤ ℓ(t) ≤ P(t)` 的单调选择都能由某套可行时刻实现。于是对一条记录，
+逐仓折算的极值只需比较「早时刻」「晚时刻」两个位置的有无（常数次二分查找）；合计极值
+则对一个位置数（换站数 + 1）的区间做一次单调动态规划：
+
+```
+dp_i(p) = 权重_i(p) + 前一台时刻在 p' ≤ p 上的最优值
+```
+
+- 不按刻扫描时间窗口（窗口可以长到 10^15）；
+- 不枚举时刻组合（换站多时组合是指数级）；
+- 不按件展开数量（数量是整数，只参与加减）。
+
+单条记录的合计代价为 `O(换站数 × 查询时刻数)`，且查询时刻只是各行实盘时刻与关账时刻，
+去重后不超过「该物料的盘点行数 + 1」。`rows` 只遍历「确实经过该仓」的记录，与全表
+记录总数无关。
+
+## 测试与生成式验证
+
+```bash
+python3 tests/run_tests.py test_reconcile       # 单元与随机对照测试
+python3 examples/verify_reconcile.py --random 1500 --scale
+```
+
+`--random` 与 `tests/reconcile_ref.py` 的穷举参考实现随机对照（参考实现逐套时刻枚举、
+逐物料取笛卡尔积）；`--scale` 用 10^15 宽的时间窗口、2000 次换站的长路线核对：
+不按刻扫描、不枚举时刻组合，耗时与窗口宽度无关。

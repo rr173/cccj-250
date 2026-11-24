@@ -1,0 +1,59 @@
+{
+  "status": "ok",
+  "close_time": 100,
+  "rows": [
+    {
+      "warehouse_id": "S",
+      "material_id": "K",
+      "count_time": 20,
+      "counted": 3,
+      "book": 3,
+      "reconciled_min": -2,
+      "reconciled_max": -2,
+      "difference_min": -5,
+      "difference_max": -5
+    },
+    {
+      "warehouse_id": "E",
+      "material_id": "M",
+      "count_time": 80,
+      "counted": 14,
+      "book": 10,
+      "reconciled_min": 10,
+      "reconciled_max": 14,
+      "difference_min": 0,
+      "difference_max": 4
+    },
+    {
+      "warehouse_id": "W",
+      "material_id": "M",
+      "count_time": 120,
+      "counted": 24,
+      "book": 20,
+      "reconciled_min": 20,
+      "reconciled_max": 24,
+      "difference_min": 0,
+      "difference_max": 4
+    }
+  ],
+  "material_totals": [
+    {
+      "material_id": "K",
+      "counted_total": 3,
+      "book_total": 3,
+      "reconciled_min": -2,
+      "reconciled_max": -2,
+      "difference_min": -5,
+      "difference_max": -5
+    },
+    {
+      "material_id": "M",
+      "counted_total": 38,
+      "book_total": 30,
+      "reconciled_min": 34,
+      "reconciled_max": 34,
+      "difference_min": 4,
+      "difference_max": 4
+    }
+  ]
+}
